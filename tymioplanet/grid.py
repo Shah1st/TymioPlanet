@@ -1,4 +1,4 @@
-"""Occupancy grid: the sheet cut into square cells, each free or occupied.
+"""Occupancy grid: the field cut into square cells, each free or occupied.
 
 A fixed grid suits this scene because it takes any obstacle shape straight from the
 segmentation mask, and a new obstacle is just more occupied cells. Its known weakness,

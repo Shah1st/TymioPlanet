@@ -1,7 +1,7 @@
 """Data passed between the modules. This is the interface the whole team codes against.
 
-World frame: on the sheet, millimetres, origin at a sheet corner, x along the long side,
-y along the short side so that the frame is right-handed seen from above.
+World frame: on the field, millimetres, origin at the inner corner of corner tag 1, x towards
+tag 2, y towards tag 4, so that the frame is right-handed seen from above.
 Heading: radians, counter-clockwise from +x, in (-pi, pi].
 """
 
@@ -28,7 +28,7 @@ class Pose:
 
 @dataclass(frozen=True)
 class Blob:
-    """One object seen on the sheet, approximated by a disc of equal area."""
+    """One object seen on the field, approximated by a disc of equal area."""
 
     kind: str  # OBSTACLE, WAYPOINT or HOME
     x_mm: float
@@ -58,12 +58,11 @@ class WorldMap:
 class Observation:
     """What the camera says for one frame.
 
-    camera_ok is False when the sheet is not visible (camera covered); pose is then None and
-    world_map is the last map built. pose is also None when only the robot tag is hidden.
-    map_changed tells the planner that obstacles or targets appeared, moved or disappeared.
+    camera_ok is False when no tag at all is visible (camera covered). pose is None then,
+    and also when only the robot tag is hidden. world_map is the map built from the one
+    snapshot; it does not change afterwards (None until the snapshot is taken).
     """
 
     camera_ok: bool
     pose: Pose | None
     world_map: WorldMap | None
-    map_changed: bool = False
