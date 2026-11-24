@@ -10,6 +10,7 @@ cannot do this: it is neither rotation nor scale invariant (course LAB 2, part 2
 
 import math
 import os
+import zlib
 
 import cv2
 import numpy as np
@@ -89,6 +90,90 @@ def correct_parallax(points_mm, nadir_mm, camera_height_mm, tag_height_mm):
     return nadir + (points - nadir) * (camera_height_mm - tag_height_mm) / camera_height_mm
 
 
+def save_print_sheet(path="tags/tags_a4.pdf", tag_mm=60.0, dpi=300):
+    """Writes one A4 page with the five tags at their real size, ready to print at 100 %.
+
+    tag_mm is the side of the black square; each tag keeps a white margin of tag_mm / 6
+    inside its cut line. A 100 mm bar on the page lets you check the print scale.
+    """
+    px = dpi / 25.4  # pixels per mm
+    page = np.full((round(297 * px), round(210 * px)), 255, dtype=np.uint8)
+    dictionary = cv2.aruco.getPredefinedDictionary(getattr(cv2.aruco, config.ARUCO_DICTIONARY))
+    margin_mm = tag_mm / 6
+    cell_mm = tag_mm + 2 * margin_mm
+
+    def text(words, x_mm, y_mm, scale=1.1):
+        cv2.putText(page, words, (round(x_mm * px), round(y_mm * px)),
+                    cv2.FONT_HERSHEY_SIMPLEX, scale, 0, 2, cv2.LINE_AA)
+
+    places = ["bottom-left (origin)", "bottom-right", "top-right", "top-left"]
+    labels = [(config.ROBOT_TAG_ID, "ROBOT - this edge is the front")]
+    labels += [(tag_id, f"CORNER - {place}")
+               for tag_id, place in zip(config.CORNER_TAG_IDS, places)]
+    columns = [(210 - 2 * cell_mm) / 3, 2 * (210 - 2 * cell_mm) / 3 + cell_mm]
+    pitch = cell_mm + 12
+    for index, (tag_id, label) in enumerate(labels):
+        x_mm, y_mm = columns[index % 2], 16 + (index // 2) * pitch
+        text(f"id {tag_id}  {label}", x_mm, y_mm - 3)
+        left, top = round(x_mm * px), round(y_mm * px)
+        cell_px = round(cell_mm * px)
+        cv2.rectangle(page, (left, top), (left + cell_px, top + cell_px), 170, 2)  # cut line
+        side_px = round(tag_mm * px)
+        tag = cv2.aruco.generateImageMarker(dictionary, tag_id, side_px)
+        offset = round(margin_mm * px)
+        page[top + offset:top + offset + side_px, left + offset:left + offset + side_px] = tag
+
+    # Scale check and instructions, in the free sixth slot.
+    x_mm, y_mm = columns[1], 16 + 2 * pitch
+    start, end = round(x_mm * px), round((x_mm + 80) * px)
+    bar_y = round((y_mm + 12) * px)
+    cv2.line(page, (start, bar_y), (end, bar_y), 0, 3)
+    for tick in (start, end):
+        cv2.line(page, (tick, bar_y - 25), (tick, bar_y + 25), 0, 3)
+    text("This bar must measure 80 mm.", x_mm, y_mm + 22)
+    text("Print at 100 % (actual size),", x_mm, y_mm + 32)
+    text("not 'fit to page'.", x_mm, y_mm + 39)
+    text("Cut along the grey lines:", x_mm, y_mm + 51)
+    text("keep the white margin.", x_mm, y_mm + 58)
+    text(f"Black square: {tag_mm:.0f} mm.", x_mm, y_mm + 70)
+
+    os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
+    _write_pdf(path, page, dpi)
+    return path
+
+
+def _write_pdf(path, grey_page, dpi):
+    """Minimal one-page PDF holding a greyscale image at its true physical size."""
+    height, width = grey_page.shape
+    points = 72.0 / dpi  # PDF units (1/72 inch) per pixel
+    page_w, page_h = width * points, height * points
+    image = zlib.compress(grey_page.tobytes(), 9)
+    content = f"q {page_w:.3f} 0 0 {page_h:.3f} 0 0 cm /Im0 Do Q".encode()
+    objects = [
+        b"<< /Type /Catalog /Pages 2 0 R >>",
+        b"<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
+        (f"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 {page_w:.3f} {page_h:.3f}] "
+         f"/Resources << /XObject << /Im0 4 0 R >> >> /Contents 5 0 R >>").encode(),
+        (f"<< /Type /XObject /Subtype /Image /Width {width} /Height {height} "
+         f"/ColorSpace /DeviceGray /BitsPerComponent 8 /Filter /FlateDecode "
+         f"/Length {len(image)} >>\nstream\n").encode() + image + b"\nendstream",
+        f"<< /Length {len(content)} >>\nstream\n".encode() + content + b"\nendstream",
+    ]
+    out = bytearray(b"%PDF-1.4\n")
+    offsets = []
+    for number, body in enumerate(objects, start=1):
+        offsets.append(len(out))
+        out += f"{number} 0 obj\n".encode() + body + b"\nendobj\n"
+    xref = len(out)
+    out += f"xref\n0 {len(objects) + 1}\n".encode() + b"0000000000 65535 f \n"
+    for offset in offsets:
+        out += f"{offset:010d} 00000 n \n".encode()
+    out += (f"trailer\n<< /Size {len(objects) + 1} /Root 1 0 R >>\n"
+            f"startxref\n{xref}\n%%EOF\n").encode()
+    with open(path, "wb") as handle:
+        handle.write(out)
+
+
 if __name__ == "__main__":
-    for saved in save_tags():
+    for saved in save_tags() + [save_print_sheet()]:
         print("saved", saved)

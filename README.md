@@ -39,7 +39,8 @@ The window shows the camera image, the rectified snapshot, and the occupancy gri
 
 ## Tags
 
-Five ArUco tags (dictionary `DICT_4X4_50`), ready to print in `tags/`
+Five ArUco tags (dictionary `DICT_4X4_50`). Print `tags/tags_a4.pdf` at 100 % on one A4 page:
+all five at 6 cm, with cut lines and a bar to check the scale. Single pictures are in `tags/`
 (`python -m tymioplanet.markers` regenerates them):
 
 | Tag id | File | Where |
