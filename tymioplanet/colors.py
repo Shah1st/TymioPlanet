@@ -1,7 +1,7 @@
-"""Finds the objects on the sheet and sorts them into obstacles, planets and Earth.
+"""Finds the objects on the field and sorts them into obstacles, planets and Earth.
 
 Two steps, each in the colour space that suits it:
-1. Object or sheet? Distance to the sheet's colour in Lab, where lightness (L) is separate
+1. Object or floor? Distance to the floor's colour in Lab, where lightness (L) is separate
    from colour (a, b). Weighting L down makes shadows, which only change lightness, count
    less, while a black object still stands out.
 2. Which object? Hue in HSV, which stays put when the lighting gets brighter or dimmer.
@@ -21,7 +21,7 @@ from .datatypes import HOME, OBSTACLE, WAYPOINT, Blob
 def segment(top_down, valid, ignore=None):
     """{OBSTACLE: mask, WAYPOINT: mask, HOME: mask}, boolean masks over the top-down image.
 
-    valid: pixels that are on the sheet. ignore: pixels to leave out (the robot).
+    valid: pixels that are on the field. ignore: pixels to leave out (the robot).
     """
     usable = valid if ignore is None else valid & ~ignore
     # Blur first: thresholding amplifies pixel noise (course LAB 2, part 2).
@@ -31,8 +31,8 @@ def segment(top_down, valid, ignore=None):
     if not usable.any():
         empty = np.zeros(valid.shape, dtype=bool)
         return {OBSTACLE: empty, WAYPOINT: empty.copy(), HOME: empty.copy()}
-    sheet_colour = np.median(lab[usable], axis=0)  # the sheet is the most common colour
-    difference = (lab - sheet_colour) * np.array([config.LIGHTNESS_WEIGHT, 1.0, 1.0], np.float32)
+    floor_colour = np.median(lab[usable], axis=0)  # the floor is the most common colour
+    difference = (lab - floor_colour) * np.array([config.LIGHTNESS_WEIGHT, 1.0, 1.0], np.float32)
     is_object = (np.linalg.norm(difference, axis=2) > config.COLOR_THRESHOLD) & usable
 
     hue, saturation, value = cv2.split(cv2.cvtColor(blurred, cv2.COLOR_BGR2HSV))

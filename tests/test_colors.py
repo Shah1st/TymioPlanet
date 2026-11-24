@@ -1,13 +1,13 @@
 import math
 
-from tymioplanet import colors, sheet, synthetic
+from tymioplanet import colors, field, markers, synthetic
 from tymioplanet.datatypes import HOME, OBSTACLE, WAYPOINT
 from tymioplanet.synthetic import BLACK, BLUE, GREEN, RED, Scene, Shape
 
 
 def _blobs(scene):
     frame = synthetic.render(scene, noise_std=3.0)
-    view = sheet.calibrate(frame)
+    view = field.calibrate(frame, markers.detect_tags(frame))
     masks = colors.segment(view.warp(frame), view.valid_mask())
     return {kind: colors.find_blobs(masks[kind], kind, view) for kind in masks}
 
@@ -39,7 +39,7 @@ def test_touching_balloons_of_different_colours_stay_separate():
     assert abs(blobs[WAYPOINT][0].x_mm - 595) < 10
 
 
-def test_empty_sheet_has_no_objects():
+def test_empty_field_has_no_objects():
     blobs = _blobs(Scene())
     assert not any(blobs.values())
 

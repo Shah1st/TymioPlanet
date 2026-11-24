@@ -3,7 +3,7 @@ import math
 import numpy as np
 import pytest
 
-from tymioplanet import config, markers, sheet, synthetic
+from tymioplanet import config, field, markers, synthetic
 from tymioplanet.datatypes import Pose
 
 
@@ -17,7 +17,7 @@ def _angle_error(a, b):
 def test_pose_from_tag(x, y, degrees):
     truth = Pose(x, y, math.radians(degrees))
     frame = synthetic.render(synthetic.Scene(robot=truth), noise_std=3.0)
-    view = sheet.calibrate(frame)
+    view = field.calibrate(frame, markers.detect_tags(frame))
     corners = markers.detect_tags(frame)[config.ROBOT_TAG_ID]
     pose = markers.pose_from_tag(corners, view)
     assert math.hypot(pose.x_mm - x, pose.y_mm - y) < 10.0
@@ -25,14 +25,15 @@ def test_pose_from_tag(x, y, degrees):
     assert -math.pi < pose.theta_rad <= math.pi
 
 
-def test_no_tag_no_detection():
-    assert markers.detect_tags(synthetic.render(synthetic.Scene())) == {}
+def test_no_robot_tag_no_robot_detection():
+    tags = markers.detect_tags(synthetic.render(synthetic.Scene()))
+    assert sorted(tags) == list(config.CORNER_TAG_IDS)  # only the four corner tags
 
 
 def test_tag_offset_moves_the_pose_back_along_the_heading():
     truth = Pose(600, 400, math.radians(90))
     frame = synthetic.render(synthetic.Scene(robot=truth))
-    view = sheet.calibrate(frame)
+    view = field.calibrate(frame, markers.detect_tags(frame))
     corners = markers.detect_tags(frame)[config.ROBOT_TAG_ID]
     pose = markers.pose_from_tag(corners, view, tag_offset_mm=(20.0, 0.0))
     assert pose.x_mm == pytest.approx(600, abs=5)

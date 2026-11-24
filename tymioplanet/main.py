@@ -3,16 +3,16 @@
     python -m tymioplanet.main --source synthetic     no hardware needed
     python -m tymioplanet.main --source 0             webcam number 0
 
-Keys in the window: q quit, c recalibrate the sheet.
-Synthetic source only: h cover / uncover the camera, b add a balloon.
+The map is made once, from the first frame showing the four corner tags.
+Keys in the window: q quit, m retake the map.
+Synthetic source only: h cover / uncover the camera.
 """
 
 import argparse
-import random
 
 import cv2
 
-from . import camera, control, filtering, local_avoidance, planning, synthetic, visualize
+from . import camera, control, filtering, local_avoidance, planning, visualize
 from .vision import VisionSystem
 
 _WINDOW = "TymioPlanet"
@@ -38,20 +38,23 @@ def main():
 
             # --- teammates' modules; each is skipped until it is implemented ---
             pose = _optional(pose_filter.update, observation.pose) or observation.pose
-            if observation.map_changed and pose is not None:
+            if path is None and observation.world_map is not None and pose is not None:
                 path = _optional(planning.plan_route, observation.world_map, pose)
             # Next, once control.Thymio exists: read sensors, pose_filter.predict(...),
             # local_avoidance.avoid(prox) or control.follow_path_step(pose, path, idx), set motors.
 
             count += 1
             if args.no_view:
-                print(count, observation.camera_ok, observation.pose, observation.map_changed)
+                print(count, observation.camera_ok, observation.pose)
             elif frame is not None:
                 cv2.imshow(_WINDOW, visualize.render_view(frame, vision_system, observation, path))
                 key = cv2.waitKey(30) & 0xFF
                 if key == ord("q"):
                     break
-                _handle_key(key, source, vision_system)
+                if key == ord("m") and vision_system.snap(frame) is not None:
+                    path = None  # new map: plan again
+                if key == ord("h") and isinstance(source, camera.SyntheticCamera):
+                    source.covered = not source.covered
             if args.frames and count >= args.frames:
                 break
     finally:
@@ -65,21 +68,6 @@ def _optional(function, *arguments):
         return function(*arguments)
     except NotImplementedError:
         return None
-
-
-def _handle_key(key, source, vision_system):
-    if key == ord("c"):
-        vision_system.recalibrate()
-    if not isinstance(source, camera.SyntheticCamera):
-        return
-    if key == ord("h"):
-        source.covered = not source.covered
-    if key == ord("b"):
-        scene = source.scene
-        colour = random.choice([synthetic.RED, synthetic.GREEN])
-        scene.shapes.append(synthetic.Shape(
-            "circle", random.uniform(100, scene.width_mm - 100),
-            random.uniform(100, scene.height_mm - 100), 50, colour))
 
 
 if __name__ == "__main__":

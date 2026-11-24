@@ -1,4 +1,4 @@
-"""Live view: camera image, rectified top-down image and occupancy grid, side by side.
+"""Live view: camera image, the rectified snapshot and the occupancy grid, side by side.
 
 Status text goes in a strip under the panels, not on top of the images (course "Common
 pitfalls": do not overlay the parameters on the image itself).
@@ -35,14 +35,15 @@ def render_view(frame, vision_system, observation, path_mm=None):
 
 def _status(observation):
     if not observation.camera_ok:
-        return "camera: COVERED    pose: none (odometry only)    map: last known"
+        return "camera: COVERED    pose: none (odometry only)"
     pose = observation.pose
     pose_text = "tag not visible" if pose is None else (
         f"x={pose.x_mm:.0f} mm  y={pose.y_mm:.0f} mm  theta={math.degrees(pose.theta_rad):.0f} deg")
     world_map = observation.world_map
+    if world_map is None:
+        return f"camera: ok    pose: {pose_text}    map: waiting for the 4 corner tags"
     return (f"camera: ok    pose: {pose_text}    obstacles: {len(world_map.obstacles)}"
-            f"  planets: {len(world_map.waypoints)}  earth: {'yes' if world_map.home else 'no'}"
-            f"{'    MAP CHANGED' if observation.map_changed else ''}")
+            f"  planets: {len(world_map.waypoints)}  earth: {'yes' if world_map.home else 'no'}")
 
 
 def _camera_panel(frame, view):
