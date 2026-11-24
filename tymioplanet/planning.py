@@ -15,6 +15,6 @@ def plan_route(world_map: WorldMap, pose: Pose) -> list[tuple[float, float]]:
       pose                     current robot pose
     Convert with tymioplanet.grid.world_to_cell / cell_to_world.
 
-    Called again whenever Observation.map_changed is True, so the visiting order may change.
+    The map comes from one snapshot and does not change afterwards.
     """
     raise NotImplementedError
