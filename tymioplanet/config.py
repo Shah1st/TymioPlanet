@@ -52,3 +52,18 @@ BLUE_HUE = (90, 130)  # Earth: start and final goal
 
 # --- Map change detection ---
 MAP_CHANGE_TOLERANCE_MM = 30.0  # a blob that moved less than this is the same blob
+
+# --- Motion (shared by the path follower and the pose filter; calibrate on the real robot) ---
+WHEELBASE_MM = 94.0  # distance between the wheels
+# Motor units per mm/s. 2.5 is 0.4 mm/s per unit (Thymio cheat sheet: 500 = about 20 cm/s);
+# the course Kalman exercise (LAB 8) measured 0.43478 mm/s per unit, i.e. 2.3.
+THYMIO_UNITS_PER_MM_S = 2.5
+
+# --- Pose filter ---
+# Standard deviation of the camera pose (x mm, y mm, heading rad). Placeholder values: measure
+# them by recording the pose of a robot standing still.
+CAMERA_POSE_STD = (5.0, 5.0, 0.035)
+# The filter rejects camera poses that disagree too much with its estimate. After this many
+# rejections in a row the camera is trusted instead and the estimate restarts from it
+# (robot moved by hand, or odometry drifted while the camera was covered).
+FILTER_RESET_AFTER_REJECTIONS = 5

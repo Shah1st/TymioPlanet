@@ -11,8 +11,8 @@ returns to Earth. An overhead camera watches a white sheet.
 | Vision: robot pose and grid map | `sheet`, `markers`, `colors`, `grid`, `vision` | done, tested on synthetic images |
 | Global navigation | `planning.py` | placeholder |
 | Local navigation | `local_avoidance.py` | placeholder |
-| Filtering | `filtering.py` | placeholder |
-| Motion control, Thymio link | `control.py` | placeholder |
+| Filtering | `filtering.py` | extended Kalman filter, tested in simulation; noise values not yet measured |
+| Motion control | `control.py` | path follower, tested in simulation; Thymio link is a placeholder |
 
 Each placeholder has the function signatures and a docstring with the units; replace the
 `raise NotImplementedError` and `main.py` starts using it.
