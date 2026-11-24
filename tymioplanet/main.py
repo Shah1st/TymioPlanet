@@ -41,7 +41,7 @@ def main():
             if observation.map_changed and pose is not None:
                 path = _optional(planning.plan_route, observation.world_map, pose)
             # Next, once control.Thymio exists: read sensors, pose_filter.predict(...),
-            # local_avoidance.avoid(prox) or control.follow_path(path, pose), set motors.
+            # local_avoidance.avoid(prox) or control.follow_path_step(pose, path, idx), set motors.
 
             count += 1
             if args.no_view:
