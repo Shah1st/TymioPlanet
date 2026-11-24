@@ -9,6 +9,7 @@ cannot do this: it is neither rotation nor scale invariant (course LAB 2, part 2
 """
 
 import math
+import os
 
 import cv2
 import numpy as np
@@ -34,7 +35,7 @@ def pose_from_tag(corners_px, view, camera_height_mm=config.CAMERA_HEIGHT_MM,
                   tag_height_mm=config.TAG_HEIGHT_MM, tag_offset_mm=config.TAG_OFFSET_MM):
     """Pose of the robot (middle of its wheel axis) in the world frame.
 
-    corners_px: the tag's 4 corners in the image. view: the calibrated SheetView.
+    corners_px: the tag's 4 corners in the image. view: the calibrated FieldView.
     The tag centre and the middle of its top edge are converted to millimetres; the heading
     is the direction from the first to the second.
     """
@@ -56,17 +57,29 @@ def pose_from_tag(corners_px, view, camera_height_mm=config.CAMERA_HEIGHT_MM,
     return Pose(float(x), float(y), theta)
 
 
-def save_tag(path, side_px=800):
-    """Writes the robot's tag as a picture to print, with the white border it needs."""
+def save_tags(folder="tags", side_px=600):
+    """Writes the five tags as pictures to print, each with its white border and a label."""
+    os.makedirs(folder, exist_ok=True)
     dictionary = cv2.aruco.getPredefinedDictionary(getattr(cv2.aruco, config.ARUCO_DICTIONARY))
-    tag = cv2.aruco.generateImageMarker(dictionary, config.ROBOT_TAG_ID, side_px)
-    border = side_px // 6
-    cv2.imwrite(path, cv2.copyMakeBorder(tag, border, border, border, border,
-                                         cv2.BORDER_CONSTANT, value=255))
+    places = ["bottom-left (origin)", "bottom-right", "top-right", "top-left"]
+    labels = {config.ROBOT_TAG_ID: ("robot", "ROBOT: this edge is the front")}
+    for tag_id, place in zip(config.CORNER_TAG_IDS, places):
+        labels[tag_id] = (f"corner_{tag_id}", f"CORNER {tag_id}: {place}")
+    paths = []
+    for tag_id, (name, label) in labels.items():
+        border = side_px // 6
+        tag = cv2.aruco.generateImageMarker(dictionary, tag_id, side_px)
+        page = cv2.copyMakeBorder(tag, border + 60, border, border, border,
+                                  cv2.BORDER_CONSTANT, value=255)
+        cv2.putText(page, f"id {tag_id}  {label}", (border, 45),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.8, 0, 2, cv2.LINE_AA)
+        paths.append(os.path.join(folder, f"tag_{tag_id}_{name}.png"))
+        cv2.imwrite(paths[-1], page)
+    return paths
 
 
 def correct_parallax(points_mm, nadir_mm, camera_height_mm, tag_height_mm):
-    """Moves points seen at tag height back to where they stand on the sheet.
+    """Moves points seen at tag height back to where they stand on the floor.
 
     A point at height h, seen from a camera at height H, appears farther from the point
     under the camera (the nadir) by the factor H / (H - h). This undoes it.
@@ -77,5 +90,5 @@ def correct_parallax(points_mm, nadir_mm, camera_height_mm, tag_height_mm):
 
 
 if __name__ == "__main__":
-    save_tag("robot_tag.png")
-    print("saved robot_tag.png: print it, stick it on the Thymio, top edge towards the front")
+    for saved in save_tags():
+        print("saved", saved)
