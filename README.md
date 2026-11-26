@@ -15,10 +15,10 @@ added later are not put on the map, the robot avoids them with its own sensors.
 | Global navigation | `planning.py` | Dijkstra on the grid plus visiting order; `plan_route(world_map, pose)` is wired into `main.py` |
 | Local navigation | `local_avoidance.py` | wall-following program for the robot, not yet run on it; leaving the wall and rejoining the path is missing |
 | Filtering | `filtering.py` | extended Kalman filter, tested in simulation; noise values not yet measured |
-| Motion control | `control.py` | path follower, tested in simulation; Thymio link is a placeholder |
+| Motion control | `control.py` | path follower, tested in simulation; robot link (`Thymio`) tested on the robot |
 
-Still missing: the link to the robot (`control.Thymio`, with tdmclient), so nothing drives yet.
-tdmclient does not run on Python 3.14; use Python 3.12 or older for the robot.
+With `--robot` the Thymio drives the planned route. Not yet tried on the real field with the
+camera, and local avoidance is not connected, so the robot does not react to its sensors yet.
 
 ## Run
 
@@ -28,14 +28,43 @@ python -m venv .venv
 pip install -r requirements.txt
 
 python -m tymioplanet.main --source synthetic    no hardware needed
-python -m tymioplanet.main --source 0            webcam 0
+python -m tymioplanet.main --source 0            webcam 0, the robot is not moved
+python -m tymioplanet.main --source 0 --robot    webcam 0, and the Thymio drives the route
 pytest
 ```
+
+If webcam 0 is the laptop's own camera, try `--source 1`.
 
 Window keys: `q` quit, `m` retake the map. With the synthetic source, `h` covers the camera.
 
 The window shows the camera image, the rectified snapshot, and the occupancy grid
 (black = seen obstacle, grey = grown by the robot radius, arrow = robot).
+
+## With the robot (on any laptop)
+
+1. Install [Thymio Suite](https://www.thymio.org/program/) and Python 3.10 or newer.
+2. Get the code and install it:
+   ```
+   git clone https://github.com/Shah1st/TymioPlanet.git
+   cd TymioPlanet
+   python -m venv .venv
+   .venv\Scripts\activate            (Linux/macOS: source .venv/bin/activate)
+   pip install -r requirements.txt
+   ```
+3. Plug in the wireless dongle (or the USB cable), switch the Thymio on, and open Thymio
+   Suite. Keep it open: it runs the Thymio Device Manager that the code talks to. Do not
+   open the robot in one of its editors, or it stays reserved for that editor.
+4. Check the connection. The robot does not move; it prints its sensors three times:
+   ```
+   python -m tymioplanet.control
+   ```
+5. Check the camera alone: `python -m tymioplanet.main --source 0`. The window must show the
+   field outline, the grid and the route.
+6. Put the robot on the field and drive: `python -m tymioplanet.main --source 0 --robot`.
+   Press `q` to stop; the wheels are stopped when the program ends.
+
+Errors: "Thymio Device Manager is not running" means Thymio Suite is closed; "no Thymio
+found" means the robot is off, asleep or not paired with the dongle.
 
 ## Tags
 
