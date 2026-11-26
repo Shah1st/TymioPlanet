@@ -1,131 +1,31 @@
-%%run_python
+"""Local navigation: wall following around obstacles that are not on the map.
 
-import os
-import sys
+Two halves:
+  - THYMIO_PROGRAM runs on the robot (sent with tdmclient, which translates this Python
+    subset to Aseba). It is a state machine driven by the five front proximity sensors:
+    0 follow the path, 1 turn away, 2 follow the wall, 3 wait, 4 blocked. In state 0 it
+    applies following_left_speed / following_right_speed, which the computer writes at
+    every control step.
+  - The functions below run on the computer. They remember where on the planned path the
+    obstacle was met, so that the end of the avoidance can be decided from the progress
+    made along that path.
+
+Lengths here are in the unit of the path they are given (millimetres in this project).
+"""
+
 import math
-from statistics import mean
-import pandas as pd
-import numpy as np
-import matplotlib.pyplot as plt
-from scipy.interpolate import interp1d
-import tdmclient.notebook
 
-await tdmclient.notebook.start()
+# Hooks set by the main loop before the robot starts.
+get_robot_pose = None  # function returning (x, y, theta) or None: use the filter estimate
+optimal_path = []      # the planned waypoints, [(x, y), ...]
 
-sys.path.insert(0, os.path.join(os.getcwd(), 'src'))
+# State of the avoidance, shared by the functions below.
+avoidance_active = False
+rejoin_requested = False
+exit_confirmations = 0
+hit_progress = 0.0
+avoidance_path = []
 
-from local_occupancy import sensor_measurements, sensor_distances
-from local_occupancy import thymio_coords, sensor_pos_from_center, sensor_angles
-from tdmclient.notebook import get_event_data, clear_event_data, send_event
-
-
-
-#CETTE PARTIE SERT A LODOMETRIE, SI TU VEUX Y JETER UN COUP DOEIL TU PEUX MAIS IL Y A ENCORE DES CHOSES A GERER
-
-'''
-def update_odometry(x, y, theta, left_motor_speed, right_motor_speed, dt):
-
-    # Thymio parameters (to calibrate)
-    k_left = 0.0004
-    k_right = 0.0004
-    b = 0.095
-    calibration()
-    ###on fait tourner les moteurs à la meme vitesse sur une surface planne
-    ###pendant le déplacement on enregistre les vitesses mesurées par le robot
-    ###et on récupère grace à la caméra les positions du robot avant et après le test
-    ###à faire séparément une fois, trouver les K_r, K_l et b
-
-
-    # Formulas have been taken from slide 6 : localisation
-    # Convert motor readings to wheel linear velocities
-    v_left = k_left * left_motor_speed
-    v_right = k_right * right_motor_speed
-
-    # Wheel displacements
-    delta_s_left = v_left * dt
-    delta_s_right = v_right * dt
-
-    # Robot displacement
-    delta_s = (delta_s_right + delta_s_left) / 2
-
-    # Robot rotation
-    delta_theta = (delta_s_right - delta_s_left) / b
-
-    # Displacement in global coordinates
-    delta_x = delta_s * math.cos(theta + delta_theta / 2)
-    delta_y = delta_s * math.sin(theta + delta_theta / 2)
-
-    # Update pose
-    x += delta_x
-    y += delta_y
-    theta += delta_theta
-
-    # Normalize orientation
-    theta = (theta + math.pi) % (2 * math.pi) - math.pi
-
-    return x, y, theta
-
-
-def normalize_angle(angle):
-    return (angle + math.pi) % (2 * math.pi) - math.pi
-
-
-def correct_odometry(odometry_pose, camera_pose, alpha=1.0):
-    """
-    Correct estimated robot pose using camera measurements.
-    odom_pose: (x, y, theta)
-    camera_pose: (x, y, theta)
-    alpha: correction gain between 0 and 1
-    """
-
-    x_odom, y_odom, odometry_theta = odometry_pose
-
-    x_cam, y_cam, theta_cam = camera_pose
-
-    # Position errors
-    error_x = x_cam - x_odom
-    error_y = y_cam - y_odom
-
-    # Orientation error
-    error_theta = normalize_angle(theta_cam - odometry_theta)
-
-    # Correct the estimated pose
-    x = x_odom + alpha * error_x
-    y = y_odom + alpha * error_y
-    theta = normalize_angle(odometry_theta + alpha * error_theta)
-
-    return x, y, theta
-
-
-#######################################
-Dans le code ca ferait:
-
-# Current pose estimate
-robot_pose = (robot_x, robot_y, robot_theta)
-
-# Predict pose using odometry
-robot_pose = update_odometry(*robot_pose, left_motor_speed, right_motor_speed, dt)
-
-# Correct if camera is on
-if camera_available:
-
-    camera_pose = (camera_x, camera_y, camera_theta)
-
-    robot_pose = correct_odometry(robot_pose, camera_pose, alpha = 1.0) # 1 has to be modified with the value of our choice ; or use the true kalmann filter
-
-# Update shared pose
-robot_x, robot_y, robot_theta = robot_pose
-#######################################
-'''
-
-
-
-#===========================================================================================
-#===========================================================================================
-#CLOSEST POINT ON PATH
-#===========================================================================================
-#===========================================================================================
-#===========================================================================================
 
 def closest_point_on_path(robot_x, robot_y, path):
     
@@ -154,7 +54,7 @@ def closest_point_on_path(robot_x, robot_y, path):
             continue
 
         # Projection onto the segment
-        t = ((robot_x - ax) * dx + (robot_y - ay) * dy / (segment_length ** 2))
+        t = ((robot_x - ax) * dx + (robot_y - ay) * dy) / (segment_length ** 2)
         t = max(0.0, min(1.0, t)) #computation of t 
 
         # Closest point
@@ -227,6 +127,7 @@ def on_event_data(node, event_name): #this function is called every single time 
     #avoidance active: indique si le notebook surveille déjà actuellement un contournement 
     #rejoin requested: indique si le notebook a déjà demandé au thymio de terminer son contournement
     #exit confirmations: C'est le compteur utilisé par check_avoidance_exit()
+    from tdmclient.notebook import clear_event_data, get_event_data  # needs the robot link
     events = get_event_data(event_name) #qd on emit("a") avec thymio, event_name = "a" 
    
     for event in events:
@@ -265,13 +166,8 @@ def on_event_data(node, event_name): #this function is called every single time 
     clear_event_data(event_name)
 
 
-#===========================================================================================
-#===========================================================================================
-#==================TIMER0==============================================================
-#===========================================================================================
-#===========================================================================================
-
-
+# The program below is not run here: it is sent to the Thymio.
+THYMIO_PROGRAM = r'''
 speed0 = 100       # nominal speed
 obstThrL = 10      # low obstacle threshold to switch state 1->0
 obstThrH = 20      # high obstacle threshold to switch state 0->1
@@ -286,10 +182,11 @@ obst = [0, 0, 0, 0, 0]
 timer_period[0] = 10
 
 
-#VARIABLES TO BE PROVIDED BY OTHERS:
-#camera_state = 0 ; #allows to know if camera is hidden
-#following_left speed = 0
-#following right speed = 0
+# Set from the computer at every control step (path follower output, Thymio units):
+following_left_speed = 0
+following_right_speed = 0
+# Not used yet: 1 while the camera sees the field (Observation.camera_ok), 0 when hidden.
+camera_state = 1
 
 #wall-following parameters
 wall_speed = 60
@@ -552,3 +449,4 @@ def timer0():
         # State 3 or 4
         motor_left_target = 0
         motor_right_target = 0
+'''
