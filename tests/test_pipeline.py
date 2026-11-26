@@ -2,7 +2,7 @@
 
 import math
 
-from tymioplanet import config, control, grid, planning, synthetic
+from tymioplanet import config, control, grid, main, planning, synthetic
 from tymioplanet.datatypes import FREE
 from tymioplanet.vision import VisionSystem
 
@@ -43,3 +43,24 @@ def test_follower_drives_the_route_without_touching_an_obstacle():
         for blob in world_map.obstacles:  # the body (80 mm) never reaches an obstacle
             assert math.hypot(x - blob.x_mm, y - blob.y_mm) > blob.radius_mm + config.ROBOT_RADIUS_MM
     assert done
+
+
+class _FakeRobot:
+    def __init__(self):
+        self.motors = None
+
+    def set_motors(self, left, right):
+        self.motors = (left, right)
+
+
+def test_drive_step_heads_for_the_waypoint_and_stands_still_without_pose_or_route():
+    robot = _FakeRobot()
+    route = [(0.0, 0.0), (500.0, 0.0)]
+    assert main.drive(robot, (0.0, 0.0, 0.0), route, 0) == 1
+    assert robot.motors[0] > 0 and robot.motors[0] == robot.motors[1]  # straight ahead
+    main.drive(robot, None, route, 1)
+    assert robot.motors == (0, 0)
+    main.drive(robot, (0.0, 0.0, 0.0), [], 0)
+    assert robot.motors == (0, 0)
+    main.drive(robot, (500.0, 0.0, 0.0), route, 1)  # on the last waypoint
+    assert robot.motors == (0, 0)
