@@ -58,18 +58,21 @@ def default_field_corners(image_size=(1280, 720)):
 
 
 def demo_scene():
-    """Earth, three planets, asteroids with a gap too narrow for the robot, and a black box."""
+    """Earth, three planets, two asteroids with a gap too narrow for the robot, a black box.
+
+    Laid out for an A1 field (841 x 594 mm), which leaves little room: the robot centre has
+    to stay about 10 cm away from every obstacle and from the border.
+    """
     shapes = [
-        Shape("circle", 150, 150, 55, BLUE),
-        Shape("circle", 1000, 200, 50, GREEN),
-        Shape("circle", 950, 680, 50, GREEN),
-        Shape("circle", 300, 650, 50, GREEN),
-        Shape("circle", 550, 250, 60, RED),
-        Shape("circle", 550, 430, 60, RED),  # 60 mm gap to the one above: a trap
-        Shape("circle", 780, 480, 55, RED),
-        Shape("square", 330, 400, 90, BLACK),
+        Shape("circle", 100, 110, 40, BLUE),
+        Shape("circle", 720, 130, 40, GREEN),
+        Shape("circle", 700, 450, 40, GREEN),
+        Shape("circle", 300, 440, 40, GREEN),
+        Shape("circle", 420, 120, 40, RED),
+        Shape("circle", 420, 250, 40, RED),  # 50 mm gap to the one below: a trap
+        Shape("square", 110, 480, 60, BLACK),
     ]
-    return Scene(shapes=shapes, robot=Pose(340, 170, math.radians(20)))
+    return Scene(shapes=shapes, robot=Pose(250, 140, math.radians(20)))
 
 
 def render(scene, image_size=(1280, 720), field_corners=None, noise_std=0.0, seed=0,

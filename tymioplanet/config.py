@@ -4,9 +4,9 @@ Units: millimetres, radians, seconds, unless a name says otherwise.
 """
 
 # --- Field: the rectangle between the inner corners of the four corner tags. ---
-# Measure the real one and set these two values.
-FIELD_WIDTH_MM = 1189.0  # from tag 1 to tag 2, world x axis (A0 paper until measured)
-FIELD_HEIGHT_MM = 841.0  # from tag 2 to tag 3, world y axis
+# An A1 sheet, long side along x. The tags' inner corners must be exactly this far apart.
+FIELD_WIDTH_MM = 841.0  # from tag 1 to tag 2, world x axis
+FIELD_HEIGHT_MM = 594.0  # from tag 2 to tag 3, world y axis
 
 # --- Top-down view and grid ---
 MM_PER_PIXEL = 2.0  # resolution of the rectified top-down image

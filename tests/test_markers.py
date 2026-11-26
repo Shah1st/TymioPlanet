@@ -12,7 +12,7 @@ def _angle_error(a, b):
 
 
 @pytest.mark.parametrize("x, y, degrees", [
-    (300, 200, 0), (600, 420, 90), (900, 600, 180), (200, 700, -135), (1000, 150, 33),
+    (300, 200, 0), (600, 420, 90), (700, 450, 180), (200, 480, -135), (740, 150, 33),
 ])
 def test_pose_from_tag(x, y, degrees):
     truth = Pose(x, y, math.radians(degrees))
