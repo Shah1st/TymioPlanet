@@ -12,13 +12,13 @@ added later are not put on the map, the robot avoids them with its own sensors.
 | Component | Module | State |
 |---|---|---|
 | Vision: robot pose and grid map | `field`, `markers`, `colors`, `grid`, `vision` | done, tested on synthetic images |
-| Global navigation | `planning.py` | placeholder |
-| Local navigation | `local_avoidance.py` | placeholder |
+| Global navigation | `planning.py` | Dijkstra on the grid plus visiting order; `plan_route(world_map, pose)` is wired into `main.py` |
+| Local navigation | `local_avoidance.py` | wall-following program for the robot, not yet run on it; leaving the wall and rejoining the path is missing |
 | Filtering | `filtering.py` | extended Kalman filter, tested in simulation; noise values not yet measured |
 | Motion control | `control.py` | path follower, tested in simulation; Thymio link is a placeholder |
 
-Each placeholder has the function signatures and a docstring with the units; replace the
-`raise NotImplementedError` and `main.py` starts using it.
+Still missing: the link to the robot (`control.Thymio`, with tdmclient), so nothing drives yet.
+tdmclient does not run on Python 3.14; use Python 3.12 or older for the robot.
 
 ## Run
 
@@ -62,8 +62,9 @@ Rules:
 
 ## With the real setup
 
-1. Place the corner tags, measure the field between their inner corners (tag 1 to tag 2, and
-   tag 2 to tag 3), and set `FIELD_WIDTH_MM`, `FIELD_HEIGHT_MM` in `tymioplanet/config.py`.
+1. The field is an A1 sheet, 841 x 594 mm, long side from tag 1 to tag 2. Place the corner
+   tags so that their inner corners are on the sheet corners. For another size, change
+   `FIELD_WIDTH_MM`, `FIELD_HEIGHT_MM` in `tymioplanet/config.py`.
 2. Fix tag 0 on the Thymio. If it is not centred on the wheel axis, set `TAG_OFFSET_MM`.
 3. Put the camera straight above, with all four corner tags in view.
 4. Lay out the balloons and obstacles, then start the program: the first frame showing the
@@ -83,7 +84,7 @@ observation.camera_ok      # False when no tag is visible (camera covered)
 observation.pose           # Pose(x_mm, y_mm, theta_rad), or None if the robot tag is not seen
 world_map = observation.world_map   # built once from the snapshot, None before it
 world_map.grid             # int8 [row, col]: 0 free, -1 obstacle; row 0 is y = 0
-world_map.grid_inflated    # same, obstacles grown by the robot radius: plan on this one
+world_map.grid_inflated    # same, obstacles grown by the robot radius (shown in the view)
 world_map.waypoints        # [Blob(kind, x_mm, y_mm, radius_mm)], the planets
 world_map.home             # Blob, Earth
 ```

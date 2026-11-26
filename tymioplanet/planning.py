@@ -8,6 +8,9 @@ from heapq import heappop, heappush
 import numpy as np
 from scipy import ndimage
 
+from . import config
+from .datatypes import OCCUPIED, Pose
+
 THYMIO_RADIUS = 0.08  # m. Thymio II ~ 11 x 11 cm, cercle circonscrit autour du centre des roues
 HELD_KARP_MAX = 12    # au-dela, Held-Karp (2^n * n^2) devient trop lent en Python
 
@@ -437,6 +440,32 @@ def compute_waypoints(occ, res, start_xy, goal_xy, asteroids, planets=(), **kw):
     mp = MissionPlanner(occ, res, start_xy, goal_xy, balloons, **kw)
     plan, _ = mp.replan()
     return plan.waypoint_list(), plan
+
+
+# ==============================================================================================
+# 6. Entry point used by main.py: from the vision map (mm) to the planner (m) and back
+# ==============================================================================================
+def plan_route(world_map, pose):
+    """Waypoints [(x_mm, y_mm), ...] from the robot through every planet, then to Earth.
+
+    world_map: tymioplanet.datatypes.WorldMap, pose: Pose (or (x_mm, y_mm, theta)).
+    The planner grows the obstacles itself (and treats the field border as a wall), so it
+    gets the raw grid, not grid_inflated. Without Earth on the map the route ends where it
+    started. Planets that cannot be reached are left out. Raises RuntimeError when the end
+    point cannot be reached.
+    """
+    x_mm, y_mm = (pose.x_mm, pose.y_mm) if isinstance(pose, Pose) else pose[:2]
+    home = world_map.home
+    waypoints, _ = compute_waypoints(
+        occ=world_map.grid == OCCUPIED,
+        res=world_map.cell_size_mm / 1000.0,
+        start_xy=(x_mm / 1000.0, y_mm / 1000.0),
+        goal_xy=None if home is None else (home.x_mm / 1000.0, home.y_mm / 1000.0),
+        asteroids=[(blob.x_mm / 1000.0, blob.y_mm / 1000.0) for blob in world_map.waypoints],
+        robot_radius=config.ROBOT_RADIUS_MM / 1000.0,
+        margin=config.SAFETY_MARGIN_MM / 1000.0,
+    )
+    return [(x * 1000.0, y * 1000.0) for x, y in waypoints]
 
 
 # ==============================================================================================
