@@ -154,15 +154,20 @@ class Thymio:
 
     def set_motors(self, left: int, right: int) -> None:
         """Wheel targets in Thymio units (-500..500)."""
+        # Sent without waiting for the robot's acknowledgement: tdmclient checks for it only
+        # every 0.1 s, which would hold up every control step by that much.
+        self._node.send_set_variables(self._targets(left, right))
+
+    @staticmethod
+    def _targets(left, right):
         left, right = (max(-500, min(500, int(round(value)))) for value in (left, right))
-        self._aw(self._node.set_variables({"motor.left.target": [left],
-                                           "motor.right.target": [right]}))
+        return {"motor.left.target": [left], "motor.right.target": [right]}
 
     def close(self) -> None:
         """Stops the wheels and gives the robot back."""
         if self._node is not None:
             try:
-                self.set_motors(0, 0)
+                self._aw(self._node.set_variables(self._targets(0, 0)))  # wait: it must arrive
                 self._aw(self._node.unlock())
             finally:
                 self._node = None

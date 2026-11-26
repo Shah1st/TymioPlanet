@@ -35,6 +35,8 @@ def main():
     source = camera.open_source(args.source)
     vision_system = VisionSystem()
     pose_filter = filtering.PoseFilter()
+    # A webcam already paces the loop (read waits for the next frame); the others need a pause.
+    key_wait_ms = 1 if isinstance(source, camera.LiveCamera) else 30
     path = None
     index = 0
     count = 0
@@ -68,7 +70,7 @@ def main():
                 print(count, observation.camera_ok, observation.pose)
             elif frame is not None:
                 cv2.imshow(_WINDOW, visualize.render_view(frame, vision_system, observation, path))
-                key = cv2.waitKey(30) & 0xFF
+                key = cv2.waitKey(key_wait_ms) & 0xFF
                 if key == ord("q"):
                     break
                 if key == ord("m") and vision_system.snap(frame) is not None:
