@@ -1,5 +1,8 @@
 """Where frames come from: a live camera, a saved picture, or the synthetic scene."""
 
+import threading
+import time
+
 import cv2
 import numpy as np
 
@@ -7,19 +10,48 @@ from . import synthetic
 
 
 class LiveCamera:
-    """A webcam (index) or a video file / stream (path or URL)."""
+    """A webcam (index) or a video file / stream (path or URL).
+
+    A webcam is read by a background thread that keeps only the newest frame. The driver
+    queues frames, so reading them one by one in a loop slower than the camera shows the
+    past: the picture, and the robot pose with it, falls further and further behind.
+    """
 
     def __init__(self, source):
         self.capture = cv2.VideoCapture(source)
         if not self.capture.isOpened():
             raise RuntimeError(f"cannot open camera source {source!r}")
-        self.capture.set(cv2.CAP_PROP_BUFFERSIZE, 1)  # always the newest frame, not a backlog
+        self._live = isinstance(source, int)  # a file must be read frame by frame instead
+        if self._live:
+            self._frame = None
+            self._fresh = threading.Condition()
+            self._running = True
+            self._thread = threading.Thread(target=self._grab, daemon=True)
+            self._thread.start()
+
+    def _grab(self):
+        while self._running:
+            ok, frame = self.capture.read()
+            with self._fresh:
+                self._frame = frame if ok else None
+                self._fresh.notify_all()
+            if not ok:
+                time.sleep(0.01)
 
     def read(self):
-        ok, frame = self.capture.read()
-        return frame if ok else None
+        """The newest frame; waits for the next one if this one was already given out."""
+        if not self._live:
+            ok, frame = self.capture.read()
+            return frame if ok else None
+        with self._fresh:
+            self._fresh.wait(timeout=1.0)
+            frame, self._frame = self._frame, None
+        return frame
 
     def release(self):
+        if self._live:
+            self._running = False
+            self._thread.join(timeout=2.0)
         self.capture.release()
 
 
