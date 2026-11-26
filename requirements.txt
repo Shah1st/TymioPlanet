@@ -2,3 +2,4 @@ numpy
 scipy
 opencv-contrib-python>=4.7
 pytest
+tdmclient

@@ -1,6 +1,7 @@
-"""Motion control: the path follower. The Thymio link is still a placeholder."""
+"""Motion control: the path follower and the link to the robot."""
 
 import math
+import time
 from dataclasses import dataclass
 
 from . import config
@@ -97,15 +98,90 @@ def follow_path_step(pose, path, idx, p: FollowerParams | None = None):
 
 
 class Thymio:
-    """PLACEHOLDER: connection to the robot (tdmclient, Thymio Device Manager running)."""
+    """Connection to the robot through the Thymio Device Manager (tdmclient).
 
-    def connect(self) -> None:
-        raise NotImplementedError
+    Thymio Suite, or its device manager alone, must be running and the robot switched on.
+
+        with Thymio() as robot:
+            sensors = robot.read_sensors()
+            robot.set_motors(50, 50)
+    """
+
+    _VARIABLES = {"prox.horizontal", "motor.left.speed", "motor.right.speed"}
+
+    def __init__(self):
+        self._client = None
+        self._node = None
+        self._aw = None
+
+    def connect(self, timeout_s: float = 10.0) -> None:
+        """Finds the robot, takes control of it and stops the program stored on it.
+
+        That program has to be stopped: it can write the motor targets at every tick and
+        cancel the ones sent from here.
+        """
+        import tdmclient  # imported here so the rest of the project runs without it
+
+        try:
+            self._client = tdmclient.ClientAsync()
+        except ConnectionRefusedError as error:
+            raise ConnectionError(
+                "Thymio Device Manager is not running: open Thymio Suite") from error
+        self._aw = tdmclient.aw
+        deadline = time.monotonic() + timeout_s
+        while not self._client.nodes:
+            if time.monotonic() > deadline:
+                self.close()
+                raise ConnectionError("no Thymio found: is it switched on and paired?")
+            self._client.process_waiting_messages()
+            time.sleep(0.05)
+        self._node = self._client.nodes[0]
+        self._aw(self._node.lock())
+        self._aw(self._node.stop())
+        self._aw(self._node.wait_for_variables(self._VARIABLES))
 
     def read_sensors(self) -> dict:
-        """{'prox_horizontal': [7 ints], 'left_speed': int, 'right_speed': int}, Thymio units."""
-        raise NotImplementedError
+        """{'prox_horizontal': [7 ints], 'left_speed': int, 'right_speed': int}, Thymio units.
+
+        Proximity: 0 when nothing is seen, up to about 4500 for an object touching the robot.
+        Speeds are the measured wheel speeds, not the targets.
+        """
+        self._client.process_waiting_messages()  # take in the latest values from the robot
+        values = self._node.v
+        return {"prox_horizontal": list(values.prox.horizontal),
+                "left_speed": int(values.motor.left.speed),
+                "right_speed": int(values.motor.right.speed)}
 
     def set_motors(self, left: int, right: int) -> None:
         """Wheel targets in Thymio units (-500..500)."""
-        raise NotImplementedError
+        left, right = (max(-500, min(500, int(round(value)))) for value in (left, right))
+        self._aw(self._node.set_variables({"motor.left.target": [left],
+                                           "motor.right.target": [right]}))
+
+    def close(self) -> None:
+        """Stops the wheels and gives the robot back."""
+        if self._node is not None:
+            try:
+                self.set_motors(0, 0)
+                self._aw(self._node.unlock())
+            finally:
+                self._node = None
+        if self._client is not None:
+            self._client.disconnect()
+            self._client = None
+
+    def __enter__(self):
+        self.connect()
+        return self
+
+    def __exit__(self, *exception):
+        self.close()
+
+
+if __name__ == "__main__":
+    # python -m tymioplanet.control : checks the connection. The robot does not move.
+    with Thymio() as thymio:
+        for _ in range(3):
+            time.sleep(0.3)
+            print(thymio.read_sensors())
+    print("robot link ok")
