@@ -16,15 +16,15 @@ def test_each_colour_goes_to_its_class():
     blobs = _blobs(Scene(shapes=[
         Shape("circle", 300, 300, 60, RED),
         Shape("square", 600, 300, 100, BLACK),
-        Shape("circle", 900, 300, 50, GREEN),
-        Shape("circle", 600, 650, 55, BLUE),
+        Shape("circle", 750, 300, 50, GREEN),
+        Shape("circle", 600, 500, 55, BLUE),
     ]))
     assert len(blobs[OBSTACLE]) == 2 and len(blobs[WAYPOINT]) == 1 and len(blobs[HOME]) == 1
 
     green, blue = blobs[WAYPOINT][0], blobs[HOME][0]
-    assert math.hypot(green.x_mm - 900, green.y_mm - 300) < 10
+    assert math.hypot(green.x_mm - 750, green.y_mm - 300) < 10
     assert abs(green.radius_mm - 50) < 5
-    assert math.hypot(blue.x_mm - 600, blue.y_mm - 650) < 10
+    assert math.hypot(blue.x_mm - 600, blue.y_mm - 500) < 10
 
     centres = sorted((round(b.x_mm, -1), round(b.y_mm, -1)) for b in blobs[OBSTACLE])
     assert centres == [(300, 300), (600, 300)]

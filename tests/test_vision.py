@@ -22,22 +22,22 @@ def test_demo_scene_end_to_end():
     assert abs(pose.theta_rad - truth.theta_rad) < math.radians(3)
 
     world_map = observation.world_map
-    assert world_map.grid.shape == (85, 119) and world_map.grid.dtype == np.int8
-    assert len(world_map.obstacles) == 4  # neither the robot nor the corner tags
+    assert world_map.grid.shape == (60, 85) and world_map.grid.dtype == np.int8
+    assert len(world_map.obstacles) == 3  # neither the robot nor the corner tags
     assert len(world_map.waypoints) == 3
-    assert math.hypot(world_map.home.x_mm - 150, world_map.home.y_mm - 150) < 10
+    assert math.hypot(world_map.home.x_mm - 100, world_map.home.y_mm - 110) < 10
 
-    assert _cell(world_map.grid, 550, 250) == OCCUPIED  # red balloon
-    assert _cell(world_map.grid, 330, 400) == OCCUPIED  # black square
+    assert _cell(world_map.grid, 420, 250) == OCCUPIED  # red balloon
+    assert _cell(world_map.grid, 110, 480) == OCCUPIED  # black square
     for target in world_map.waypoints + [world_map.home]:
         assert _cell(world_map.grid, target.x_mm, target.y_mm) == FREE
 
 
 def test_the_trap_between_two_asteroids_is_closed_only_in_the_inflated_grid():
     world_map = VisionSystem().update(synthetic.render(synthetic.demo_scene())).world_map
-    assert _cell(world_map.grid, 550, 340) == FREE
-    assert _cell(world_map.grid_inflated, 550, 340) == OCCUPIED
-    assert _cell(world_map.grid_inflated, 800, 150) == FREE  # open space stays open
+    assert _cell(world_map.grid, 420, 185) == FREE
+    assert _cell(world_map.grid_inflated, 420, 185) == OCCUPIED
+    assert _cell(world_map.grid_inflated, 650, 300) == FREE  # open space stays open
 
 
 def test_the_map_is_made_once_and_then_only_the_robot_is_tracked():
@@ -45,12 +45,12 @@ def test_the_map_is_made_once_and_then_only_the_robot_is_tracked():
     vision_system = VisionSystem()
     first = vision_system.update(synthetic.render(scene))
 
-    scene.shapes.append(Shape("circle", 700, 150, 50, RED))  # obstacle added afterwards
-    scene.robot = Pose(900, 400, math.radians(-90))  # and the robot has moved
+    scene.shapes.append(Shape("circle", 650, 300, 50, RED))  # obstacle added afterwards
+    scene.robot = Pose(600, 400, math.radians(-90))  # and the robot has moved
     later = vision_system.update(synthetic.render(scene))
 
-    assert later.world_map is first.world_map and len(later.world_map.obstacles) == 4
-    assert math.hypot(later.pose.x_mm - 900, later.pose.y_mm - 400) < 10
+    assert later.world_map is first.world_map and len(later.world_map.obstacles) == 3
+    assert math.hypot(later.pose.x_mm - 600, later.pose.y_mm - 400) < 10
     assert abs(later.pose.theta_rad - math.radians(-90)) < math.radians(3)
 
 
@@ -58,7 +58,7 @@ def test_snap_retakes_the_map():
     scene = synthetic.demo_scene()
     vision_system = VisionSystem()
     vision_system.update(synthetic.render(scene))
-    scene.shapes.append(Shape("circle", 700, 150, 50, GREEN))
+    scene.shapes.append(Shape("circle", 600, 300, 50, GREEN))
     world_map = vision_system.snap(synthetic.render(scene))
     assert len(world_map.waypoints) == 4 and vision_system.world_map is world_map
 
@@ -94,7 +94,7 @@ def test_hidden_robot_tag_gives_no_pose_but_still_a_map():
     scene.robot = None
     observation = VisionSystem().update(synthetic.render(scene))
     assert observation.camera_ok and observation.pose is None
-    assert len(observation.world_map.obstacles) == 4
+    assert len(observation.world_map.obstacles) == 3
 
 
 def test_live_view_renders_in_every_state():
@@ -103,6 +103,6 @@ def test_live_view_renders_in_every_state():
     assert visualize.render_view(black, vision_system, vision_system.update(black)).ndim == 3
     frame = synthetic.render(synthetic.demo_scene())
     observation = vision_system.update(frame)
-    view = visualize.render_view(frame, vision_system, observation, [(340, 170), (1000, 200)])
+    view = visualize.render_view(frame, vision_system, observation, [(250, 140), (700, 200)])
     assert view.ndim == 3 and view.shape[1] > frame.shape[1]
     assert visualize.render_view(black, vision_system, vision_system.update(black)).ndim == 3

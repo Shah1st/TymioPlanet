@@ -1,4 +1,4 @@
-"""Runs the whole project. Today that is the vision part plus placeholders for the rest.
+"""Runs the whole project: vision, pose filter and route planning. The robot link is missing.
 
     python -m tymioplanet.main --source synthetic     no hardware needed
     python -m tymioplanet.main --source 0             webcam number 0
@@ -36,12 +36,13 @@ def main():
             frame = source.read()
             observation = vision_system.update(frame)
 
-            # --- teammates' modules; each is skipped until it is implemented ---
-            pose = _optional(pose_filter.update, observation.pose) or observation.pose
+            pose = pose_filter.update(observation.pose) or observation.pose
             if path is None and observation.world_map is not None and pose is not None:
-                path = _optional(planning.plan_route, observation.world_map, pose)
-            # Next, once control.Thymio exists: read sensors, pose_filter.predict(...),
-            # local_avoidance.avoid(prox) or control.follow_path_step(pose, path, idx), set motors.
+                path = _plan(observation.world_map, pose)
+            # Next, once control.Thymio exists: send local_avoidance.THYMIO_PROGRAM once, then
+            # at every step read the wheel speeds, pose_filter.predict(...), and write the
+            # output of control.follow_path_step(pose, path, idx) to following_left_speed /
+            # following_right_speed on the robot.
 
             count += 1
             if args.no_view:
@@ -62,12 +63,13 @@ def main():
         cv2.destroyAllWindows()
 
 
-def _optional(function, *arguments):
-    """Result of a teammate's function, or None while it is still a placeholder."""
+def _plan(world_map, pose):
+    """The route, or an empty list (so it is not tried again every frame) when there is none."""
     try:
-        return function(*arguments)
-    except NotImplementedError:
-        return None
+        return planning.plan_route(world_map, pose)
+    except RuntimeError as error:
+        print("no route:", error)
+        return []
 
 
 if __name__ == "__main__":
